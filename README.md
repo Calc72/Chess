@@ -1,8 +1,8 @@
 # Chess
-Before starting, go to line 57 of the Chess Code, and replace the x's with the location of the Image Files folder on your computer.  Make sure the Chess Code and Image Files
-are in the same files.  Sorry for the hassle.
+This game requires Pygame to run. And before starting, go to line 57 of the Chess Code, and replace the x's with the location of the Image Files folder on your computer.
+Make sure the Chess Code and Image Files are in the same folder.  Sorry for the hassle.
   
-Instructions for Play:
+How To Play:
 
   To select a piece, click it.
   
