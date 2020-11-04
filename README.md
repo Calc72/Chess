@@ -1,5 +1,8 @@
 # Chess
-Instructions:
+Before starting, go to line 57 of the Chess Code, and replace the x's with the location of the Image Files folder on your computer.  Make sure the Chess Code and Image Files
+are in the same files.  Sorry for the hassle.
+  
+Instructions for Play:
 
   To select a piece, click it.
   
