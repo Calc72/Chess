@@ -54,7 +54,7 @@ def Setup():
 
 # Loads the images
 def LoadImages():
-    Path = r"C:\Users\brayd\Desktop\Python Projects\Chess\Image Files"
+    Path = r"C:\xxxxxxxxxxx"
     imagesList = listdir(Path)
     for thing in imagesList:
         my_file = os.path.join(Path, thing)
