@@ -1,0 +1,1038 @@
+#It's done now, just try to find bugs:
+# - A black rook reached the bottom rank and then transformed into a queen.
+
+#To organize my Spaghetti Code:
+#   -80 character max per line.  78 or 77 would look cleaner.
+#   -Remove unnecessary nesting (if-else, for, while, etc.)
+#   -Make a function that tests a hypothetical move
+#     then undoes it w/o changing the board display.
+#     This was something that popped up often enough that
+#     I think having a function to do this would remove
+#     some repetition from my code.
+
+# Imported Modules
+import pygame
+import time
+import random
+import os
+from os import listdir
+
+
+# Global Variables
+tile_size = 74
+piece_count = 32
+panel_height = 100
+button_width = 55
+button_height = 35
+display_height = 8*tile_size + panel_height
+display_width = 8*tile_size
+
+piece_data = []
+buttonID = []
+move_record = []
+move_count = len(move_record)
+black = (0,0,0)
+
+turn = 'white'
+buttonID = [0,0,0,0]
+
+
+# I don't know what to call these
+pygame.init()
+gameDisplay = pygame.display.set_mode((display_width,display_height))
+clock = pygame.time.Clock()
+image_list = []
+
+
+# Initializes the Display at the start of the game.
+def Setup():
+    LoadImages()
+    CreatePieceData()
+    DisplayDeselectedBoard()
+    DisplayBottomPanel()
+    
+
+# Loads the images
+def LoadImages():
+    Path = r"C:\Users\brayd\Desktop\Python Projects\Chess\Image Files"
+    imagesList = listdir(Path)
+    for thing in imagesList:
+        my_file = os.path.join(Path, thing)
+        thang = pygame.image.load(my_file)
+        
+        image_name = str(thing)
+        image_name = image_name.replace('.png','IMG')
+
+        image_list.append([image_name,thang])
+
+    for entry in range(len(image_list)):
+        globals()[image_list[entry][0]] = image_list[entry][1]
+
+    
+# Creates the list 'piece_data', which defines the state of the board.
+def CreatePieceData():
+    x = tile_size
+    for i in range(0,8):
+        piece_data.append(['white','pawn',i,[x*i,x*6]])
+    for i in range(0,8):
+        piece_data.append(['black','pawn',i,[x*i,x*1]])
+    for i in range(0,2):
+        piece_data.append(['white','rook',i,[x*(7*i),x*7]])
+    for i in range(0,2):
+        piece_data.append(['black','rook',i,[x*(7*i),x*0]])
+    for i in range(0,2):
+        piece_data.append(['white','nite',i,[x*((5*i)+1),x*7]])
+    for i in range(0,2):
+        piece_data.append(['black','nite',i,[x*((5*i)+1),x*0]])
+    for i in range(0,2):
+        piece_data.append(['white','bish',i,[x*((3*i)+2),x*7]])
+    for i in range(0,2):
+        piece_data.append(['black','bish',i,[x*((3*i)+2),x*0]])    
+    piece_data.append(['white','quee',0,[x*4,x*7]])
+    piece_data.append(['black','quee',0,[x*4,x*0]])
+    piece_data.append(['white','king',0,[x*3,x*7]])
+    piece_data.append(['black','king',0,[x*3,x*0]])
+
+
+# Updates the specified square on the board.
+# Input values range from 0 to 7 for column and row.
+# The boolean 'selected' determines whether or not to highlight the square.
+def UpdateBoardSquare(column,row,selected):
+    gameDisplay.fill(black,(column,row,tile_size,tile_size))
+    if selected == True:
+        if ((column+row)/tile_size)%2 == 0:
+            gameDisplay.blit(black_selectIMG,(column,row))
+        else:
+            gameDisplay.blit(white_selectIMG,(column,row))
+    else:
+        if ((column+row)/tile_size)%2 == 0:
+            gameDisplay.blit(black_squareIMG,(column,row))
+        else:
+            gameDisplay.blit(white_squareIMG,(column,row))
+
+    for i in range(0,piece_count):
+        if piece_data[i][3] == [column,row]:
+            DisplayPiece(i)
+
+
+# Displays the current board state with no pieces selected.
+def DisplayDeselectedBoard():
+    for row in range(0,8*tile_size,tile_size):
+        for column in range(0,8*tile_size,tile_size):
+            UpdateBoardSquare(column,row,False)
+    pygame.display.update()
+
+
+# Update the display of the specified piece.
+# Input values range from 0 to 31.
+def DisplayPiece(index):
+    name = piece_data[index][0] + '_' + piece_data[index][1] + 'IMG'
+    position = piece_data[index][3]
+    gameDisplay.blit(eval(name),(position))
+
+
+# Displays the panel below the chess board.
+# Also resets the button presses involving control and synergy.
+def DisplayBottomPanel():
+    x = tile_size
+    gameDisplay.fill(black,(0,8*x,8*x,panel_height))
+    for segment in range(0,8):
+        gameDisplay.blit(chess_panelIMG,(segment*x,8*x))
+
+    name = turn + '_selectIMG'
+    gameDisplay.blit(turn_headerIMG,(2*x,(8*x)+5))
+    gameDisplay.blit(eval(name),(2*x,(8*x)+21))
+
+    gameDisplay.blit(panel_frameIMG,((5*x)-13,(8*x)+5))
+    DisplayButtonState(buttonID)
+
+
+# Displays the shield level of a certain piece.
+def DisplaySynergyShield(i,synergy_square_list,frame):
+    x = tile_size
+    shield_level = 0
+
+    if frame >= 100:
+        red_shield = 1
+    else:
+        red_shield = 0
+        
+    for entry in range(len(synergy_square_list)):
+        if synergy_square_list[entry] == piece_data[i][3]:
+            shield_level += 1
+
+    location = (piece_data[i][3][0],piece_data[i][3][1])   
+    if shield_level == 0:
+        gameDisplay.blit(synergy_sheetIMG,location,((red_shield)*x,0,x,x))
+    elif shield_level <= 3:
+        gameDisplay.blit(synergy_sheetIMG,location,((shield_level+1)*x,0,x,x))
+    else:
+        gameDisplay.blit(synergy_sheetIMG,location,(5*x,0,x,x))
+
+# Displays the current state of the assist buttons.
+# buttonID is a list of numbers where 0 represents off and 1 represents on.
+def DisplayButtonState(buttonID):
+    corner = [(5*tile_size)-13,(8*tile_size)+5]
+    for column in range(0,2):
+        for row in range(0,2):
+            index = (2*column)+row
+            gameDisplay.blit(button_sheetIMG,(corner[0]+17+(37*column),corner[1]+17+(36*row)),(35*buttonID[index],0,35,34))
+
+            
+# Calculates the squares that a piece may occupy on its next turn, regardless of
+# whether or not the move would result in its king being put in check.
+# Does not include the En Passant or Castle moves.
+def CalculateOpenSquares(i):
+    x = tile_size
+    rook_direction_list = [[0,x],[0,-x],[x,0],[-x,0]]
+    bish_direction_list = [[x,x],[-x,x],[x,-x],[-x,-x]]
+    quee_direction_list = rook_direction_list + bish_direction_list
+    king_direction_list = quee_direction_list
+    nite_direction_list = [[2*x,x],[2*x,-x],[-2*x,x],[-2*x,-x],[x,2*x],[x,-2*x],[-x,2*x],[-x,-2*x]]
+    square = [piece_data[i][3][0],piece_data[i][3][1]]
+    
+    open_move_list = []
+
+    if piece_data[i][1] == 'pawn':
+        scan_station = [piece_data[i][3][0],piece_data[i][3][1]]
+        obstacle = False
+        Two_Move = True
+
+        if piece_data[i][0] == 'white':
+            pawn_direction_list = [[0,-x],[-x,-x],[x,-x],[0,-2*x]]
+        else:
+            pawn_direction_list = [[0,x],[-x,x],[x,x],[0,2*x]]
+
+        for entry in range(len(move_record)):
+            if move_record[entry][0] != 'CASTLE':
+                if move_record[entry][1] == i or move_record[entry][6] == i:
+                    Two_Move = False
+        scan_square = [sum(x) for x in zip(scan_station,pawn_direction_list[0])]
+        for i in range(0,piece_count):
+            if scan_square == piece_data[i][3]:
+                Two_Move = False
+
+        for list_index in range(len(pawn_direction_list)):
+            scan_square = [sum(x) for x in zip(scan_station,pawn_direction_list[list_index])]
+            empty = True
+            for k in range(0,piece_count):
+                if piece_data[k][3] == scan_square:
+                    empty = False
+                    team = piece_data[k][0]
+                    
+            if list_index == 0:
+                if empty == True:
+                    open_move_list.append(scan_square)
+            if list_index == 1 or list_index == 2:
+                if empty == False and team != turn:
+                    open_move_list.append(scan_square)
+            if list_index == 3 and Two_Move == True:
+                if empty == True:
+                    open_move_list.append(scan_square)
+                    
+    else:
+        move_list = eval(piece_data[i][1] + '_direction_list')
+        for list_index in range(len(move_list)):
+            scan_station = square
+            obstacle = False
+            while obstacle == False:
+                scan_square = [sum(x) for x in zip(scan_station,move_list[list_index])]
+                if 0 <= scan_square[0] < (8*tile_size) and 0 <= scan_square[1] < (8*tile_size):
+                    for j in piece_data:
+                        if scan_square == j[3]:
+                            if j[0] != piece_data[i][0]:
+                                open_move_list.append(scan_square)
+                            obstacle = True
+                    if obstacle == False:
+                        open_move_list.append(scan_square)
+                        scan_station = [sum(x) for x in zip(scan_station,move_list[list_index])]
+                    if piece_data[i][1] == 'king' or piece_data[i][1] == 'nite':
+                        obstacle = True
+                else:
+                    obstacle = True
+
+    open_move_list = RemoveDuplicates(open_move_list)
+    return open_move_list
+
+
+# Calculates the squares that a certain team may occupy in their next turn,
+# regardless of whether or not that move would result in their king being placed
+# in check.
+def CalculateControlledSquares(color):
+    x = tile_size
+    open_move_list = []
+    exempt_square_list = []
+    blacklist = []
+    scan_square = []
+
+    controlled_square_list = []
+    
+    for i in range(0,piece_count):
+        if piece_data[i][0] == color:
+            if piece_data[i][3][0] != 8*tile_size and piece_data[i][1] != 'pawn':
+                open_move_list = CalculateOpenSquares(i)
+            else:
+                scan_station = [piece_data[i][3][0],piece_data[i][3][1]]
+                if piece_data[i][0] == 'white':
+                    pawn_direction_list = [[0,-x],[-x,-x],[x,-x],[0,-2*x]]
+                else:
+                    pawn_direction_list = [[0,x],[-x,x],[x,x],[0,2*x]]
+                    
+                for list_index in range(len(pawn_direction_list)):
+                    scan_square = [sum(y) for y in zip(scan_station,pawn_direction_list[list_index])]
+                    if list_index == 1 or list_index == 2:
+                        open_move_list.append(scan_square)
+
+            for e in range(len(open_move_list)):
+                controlled_square_list.append(open_move_list[e])
+            del open_move_list[:]
+
+    for j in piece_data:
+        if j[0] == color:
+            exempt_square_list.append(j[3])
+
+    for e in range(len(controlled_square_list)):
+        if controlled_square_list[e] in exempt_square_list:
+            blacklist.append(e)
+
+    for e in range(len(blacklist)):
+        del controlled_square_list[blacklist[e]-e]
+
+    controlled_square_list = RemoveDuplicates(controlled_square_list)
+    return controlled_square_list
+
+
+# Calculates the number of other pieces on a team that protect each piece.
+# The RemoveDuplicates() function is not used here since this data is intended
+# to stack.
+def CalculateProtectedSquares(color):
+    x = tile_size
+    rook_direction_list = [[0,x],[0,-x],[x,0],[-x,0]]
+    bish_direction_list = [[x,x],[-x,x],[x,-x],[-x,-x]]
+    quee_direction_list = rook_direction_list + bish_direction_list
+    king_direction_list = quee_direction_list
+    pawn_direction_list = bish_direction_list
+    nite_direction_list = [[2*x,x],[2*x,-x],[-2*x,x],[-2*x,-x],[x,2*x],[x,-2*x],[-x,2*x],[-x,-2*x]]
+
+    synergy_move_list = []
+    
+    for j in piece_data:
+        if j[0] == color and j[3] != [8*tile_size,8*tile_size]:
+            if j[1] == 'pawn':
+                if color == 'black':
+                    start = 0
+                else:
+                    start = 2
+                    
+                for list_index in range(start,start+2):
+                    scan_station = j[3]
+                    obstacle = False
+                    while obstacle == False:
+                        scan_square = [sum(x) for x in zip(scan_station,pawn_direction_list[list_index])]
+                        if 0 <= scan_square[0] < (8*tile_size) and 0 <= scan_square[1] < (8*tile_size):
+                            for k in piece_data:
+                                if k[0] == color and k[3] == scan_square:
+                                    synergy_move_list.append(scan_square)
+                        obstacle = True
+
+            else:
+                move_list = eval(j[1] + '_direction_list')
+                test = j[1] + '_direction_list'
+                for list_index in range(len(move_list)):
+                    scan_station = j[3]
+                    obstacle = False
+                    while obstacle == False:
+                        scan_square = [sum(x) for x in zip(scan_station,move_list[list_index])]
+                        if 0 <= scan_square[0] < (8*tile_size) and 0 <= scan_square[1] < (8*tile_size):
+                            for k in piece_data:
+                                if scan_square == k[3]:
+                                    if k[0] == color:
+                                        synergy_move_list.append(scan_square)
+                                    obstacle = True
+                                    
+                            if obstacle == False:
+                                scan_station = [sum(x) for x in zip(scan_station,move_list[list_index])]
+                            if j[1] == 'king' or j[1] == 'nite':
+                                obstacle = True
+                        else:
+                            obstacle = True
+
+    return synergy_move_list
+
+
+# Determines the valid moves that a piece can make.
+def CalculateValidMoves(i):
+    possible_move_list = []
+    
+    dead_piece_spot = [8*tile_size,8*tile_size]
+    original_spot = piece_data[i][3]
+    possible_moves = CalculateOpenSquares(i)
+    for entry in range(len(possible_moves)):
+        for k in range(0,piece_count):
+            if piece_data[k][3] == possible_moves[entry]:
+                dead_piece_spot = piece_data[k][3]
+                dead_piece_number = k
+                piece_data[k][3] = [8*tile_size,8*tile_size]
+        piece_data[i][3] = possible_moves[entry]
+        Check = CheckForCheck(turn)           
+        if Check == False:
+            possible_move_list.append(possible_moves[entry])
+        piece_data[i][3] = original_spot
+        if dead_piece_spot != [8*tile_size,8*tile_size]:
+            piece_data[dead_piece_number][3] = dead_piece_spot
+
+    possible_move_list = RemoveDuplicates(possible_move_list)
+    return possible_move_list
+
+
+# Highlights the legal moves that the selected piece can make on its turn.
+# This does not allow moves that will put or leave the king in check.
+def HighlightPossibleMoves(i,x_pos,y_pos):
+    DisplayDeselectedBoard()
+    possible_move_list = CalculateValidMoves(i)
+    
+    for entry in range(len(possible_move_list)):
+        gameDisplay.blit(open_squareIMG,(possible_move_list[entry]))
+        for i in range(0,piece_count):
+            if piece_data[i][3] == possible_move_list[entry]:
+                DisplayPiece(i)
+
+    UpdateBoardSquare(x_pos,y_pos,True)
+    pygame.display.update()
+
+    return possible_move_list
+
+
+# Determines if the specified team can perform a Castle.
+def CanYouCastle(turn):
+    global piece_data
+    possible_moves = []
+    
+    occupied_squares = []
+    L_castle = True
+    R_castle = True
+
+    if turn == 'black':
+        rank = 0
+        data_delta = 2
+    else:
+        rank = 7
+        data_delta = 0
+
+    left_rook = int(16 + data_delta)
+    right_rook = int(17 + data_delta)
+    king = int(30 + (data_delta/2))
+    for entry in range(len(move_record)):
+        if move_record[entry][0] == 'CASTLE' and move_record[entry][1] == turn:
+            L_castle = False
+            R_castle = False
+        if move_record[entry][1] == king:
+            L_castle = False
+            R_castle = False
+        if move_record[entry][1] == left_rook or move_record[entry][6] == left_rook:
+            L_castle = False
+        if move_record[entry][1] == right_rook or move_record[entry][6] == right_rook:
+            R_castle = False
+        
+    for j in piece_data:
+        occupied_squares.append(j[3])
+    for x in range(1,3):
+        if [x*tile_size,rank*tile_size] in occupied_squares:
+            L_castle = False
+    for x in range(4,7):
+        if [x*tile_size,rank*tile_size] in occupied_squares:
+            R_castle = False
+
+    Check = CheckForCheck(turn)
+    if Check == True:
+        L_castle = False
+        R_castle = False
+
+    for travel in range(0,2):
+        piece_data[king][3][0] -= travel*tile_size
+        Check = CheckForCheck(turn)
+        if Check == True:
+            L_castle = False
+    piece_data[king][3][0] += 2*tile_size
+
+    for travel in range(0,2):
+        piece_data[king][3][0] += travel*tile_size
+        Check = CheckForCheck(turn)
+        if Check == True:
+            R_castle = False
+    piece_data[king][3][0] -= 2*tile_size
+            
+    if L_castle == True:
+        possible_moves.append([0,rank*tile_size])
+        gameDisplay.blit(special_squareIMG,(0,rank*tile_size))
+        DisplayPiece(left_rook)
+    if R_castle == True:
+        possible_moves.append([7*tile_size,rank*tile_size])
+        gameDisplay.blit(special_squareIMG,(7*tile_size,rank*tile_size))
+        DisplayPiece(right_rook)
+
+    return possible_moves
+
+
+# Determines if the specified piece may perform an En Passant.
+def CanYouPassant(i):
+    possible_moves = []
+    
+    attackable = 8
+    square = piece_data[i][3]
+    left_square = [square[0]-tile_size,square[1]]
+    right_square = [square[0]+tile_size,square[1]]
+
+    L_passant = False
+    R_passant = False
+    Two_Move = False
+
+    if move_count != 0:
+        past_move = move_record[move_count-1]
+        if past_move[0] == 'NORMAL':
+            if past_move[2] == past_move[4] and abs(past_move[3] - past_move[5]) == 2*tile_size:
+                Two_Move = True
+                attackable = (past_move[1])%8
+
+    if turn == 'white':
+        enemy_turn = 'black'
+        direction = -1
+    elif turn == 'black':
+        enemy_turn = 'white'
+        direction = 1
+            
+    for k in range(0,piece_count):        
+        if [enemy_turn,'pawn',attackable,left_square] == piece_data[k] and Two_Move == True:
+            piece_data[i][3] = [left_square[0],left_square[1]+(direction*tile_size)]
+            piece_data[k][3] = [8*tile_size,8*tile_size]
+            Check = CheckForCheck(turn)
+            if Check == False:
+                L_passant = True
+                kill_id = k
+            piece_data[i][3] = [piece_data[i][3][0]+tile_size,piece_data[i][3][1]-(direction*tile_size)]
+            piece_data[k][3] = [sum(x) for x in zip(piece_data[i][3],[-tile_size,0])]
+        if [enemy_turn,'pawn',attackable,right_square] == piece_data[k] and Two_Move == True:
+            piece_data[i][3] = [right_square[0],right_square[1]+(direction*tile_size)]
+            piece_data[k][3] = [8*tile_size,8*tile_size]
+            Check = CheckForCheck(turn)
+            if Check == False:
+                R_passant = True
+                kill_id = k
+            piece_data[i][3] = [piece_data[i][3][0]-tile_size,piece_data[i][3][1]-(direction*tile_size)]
+            piece_data[k][3] = [sum(x) for x in zip(piece_data[i][3],[tile_size,0])]
+
+    if L_passant == True:
+        possible_moves.append([left_square[0],left_square[1]])
+        gameDisplay.blit(special_squareIMG,(left_square[0],left_square[1]))
+        DisplayPiece(kill_id)
+    if R_passant == True:
+        possible_moves.append([right_square[0],right_square[1]])
+        gameDisplay.blit(special_squareIMG,(right_square[0],right_square[1]))
+        DisplayPiece(kill_id)
+
+    return possible_moves
+
+
+# Performs a castle.
+def CastleMove(x_pos,y_pos,i):
+    global piece_data,turn
+
+    x_pos = float(x_pos/tile_size)
+    y_pos = float(y_pos/tile_size)
+
+    rook = 18 + (x_pos / 7) - 2*(y_pos / 7)
+    king = 31 - (y_pos / 7)
+
+    if x_pos == 0:
+        piece_data[int(king)][3][0] -= (2*tile_size)
+        piece_data[int(rook)][3][0] = piece_data[int(king)][3][0] + tile_size
+        side = 'left'
+    else:
+        piece_data[int(king)][3][0] += (2*tile_size)
+        piece_data[int(rook)][3][0] = piece_data[int(king)][3][0] - tile_size
+        side = 'right'
+    
+    DisplayDeselectedBoard()
+
+    AddToRecord('CASTLE','NULL','NULL','NULL','NULL','NULL',turn,side,'NULL','NULL','NULL')
+        
+    if turn == 'white':
+        turn = 'black'
+    elif turn == 'black':
+        turn = 'white'
+
+    CheckForCheckmate(turn)
+        
+    
+# Performs an En Passant.
+def EnPassantMove(x_pos,y_pos,i):
+    global piece_data,turn
+    
+    if turn == 'white':
+        for j in piece_data:
+            if j[3] == [piece_data[i][3][0],piece_data[i][3][1]]:
+                j[3] = [x_pos,2*tile_size]
+                i = j[2]
+                x_old = piece_data[i][3][0]
+                y_old = piece_data[i][3][1]
+            if j[3] == [x_pos,y_pos]:
+                j[3] = [8*tile_size,8*tile_size]
+                kill = j[2]
+                kill_x = x_pos
+                kill_y = y_pos
+    if turn == 'black':
+        for j in piece_data:
+            if j[3] == [piece_data[i][3][0],piece_data[i][3][1]]:
+                j[3] = [x_pos,5*tile_size]
+                i = j[2]
+                x_old = piece_data[i][3][0]
+                y_old = piece_data[i][3][1]
+            if j[3] == [x_pos,y_pos]:
+                j[3] = [8*tile_size,8*tile_size]
+                kill = j[2]
+                kill_x = x_pos
+                kill_y = y_pos
+
+    DisplayDeselectedBoard()
+
+    AddToRecord('PASSANT',i,x_old,y_old,'NULL','NULL','NULL','NULL',kill,kill_x,kill_y)
+    
+    if turn == 'white':
+        turn = 'black'
+    elif turn == 'black':
+        turn = 'white'
+
+    CheckForCheckmate(turn)
+
+
+# Performs a normal move.    
+def MovePiece(x_pos,y_pos,i):
+    global piece_data,turn
+    kill = 'NULL'
+    kill_x = 'NULL'
+    kill_y = 'NULL'
+    (x_old,y_old) = piece_data[i][3]
+    gameDisplay.fill(black,(x_pos,y_pos,tile_size,tile_size))
+    gameDisplay.fill(black,(x_old,y_old,tile_size,tile_size))
+
+    for e in range(0,piece_count):
+        if piece_data[e][3] == [x_pos,y_pos]:
+            piece_data[e][3] = [8*tile_size,8*tile_size]
+            kill = e
+            kill_x = x_pos
+            kill_y = y_pos
+            
+    piece_data[i][3] = [x_pos,y_pos]
+    DisplayDeselectedBoard()
+
+    AddToRecord('NORMAL',i,x_old,y_old,x_pos,y_pos,'NULL','NULL',kill,kill_x,kill_y)
+            
+    if turn == 'white':
+        turn = 'black'
+    elif turn == 'black':
+        turn = 'white'
+
+    CheckForCheckmate(turn)
+
+    
+# Updates a record of every move made in the current game.
+# Normal Move Record: [move_type, piece#, old x, old y, new x, new y, kill#, kill x, kill y]
+# En Passant Record: [move_type, piece#, old x, old y, side, kill#, kill x, kill y]]
+# Castle Record: [move_type, color, side]
+def AddToRecord(move_type,i,x_old,y_old,x_new,y_new,color,side,kill,kill_x,kill_y):
+    global move_record, move_count
+
+    move_record.append([move_type,i,x_old,y_old,x_new,y_new,kill,kill_x,kill_y])        
+    move_count = len(move_record)
+
+
+# Removes any duplicate entries found in a list.
+# I feel like there's already a function for this, but whatever.
+def RemoveDuplicates(dirt):
+    clean = []
+    blacklist = []
+
+    while len(dirt) != 0:
+        del blacklist[:]
+        scan = dirt[0]
+        clean.append(scan)
+        for e in range(len(dirt)):
+            if dirt[e] == scan:
+                blacklist.append(e)
+
+        for e in range(len(blacklist)):
+            del dirt[blacklist[e]-e]
+                
+    return clean
+
+
+# Checks if the specified king is in check
+def CheckForCheck(turn):
+    if turn == 'white':
+        enemy_turn = 'black'
+    else:
+        enemy_turn = 'white'
+    Check = False
+    
+    for j in piece_data:
+        if j[0] == turn and j[1] == 'king':
+            king_square = j[3]
+    
+    controlled_squares_list = CalculateControlledSquares(enemy_turn)
+    if king_square in controlled_squares_list:
+        Check = True
+
+    return Check
+
+
+# Checks if the specified king is in checkmate or stalemate.
+# The game will end if either condition is met. (Once I code that)
+def CheckForCheckmate(turn):
+    possible_moves = []
+    possible_move_list = []
+
+    for i in range(0,piece_count):
+        if piece_data[i][0] == turn and piece_data[i][3] != [8*tile_size,8*tile_size]:
+            possible_moves = CalculateValidMoves(i)
+            for entry in range(len(possible_moves)):
+                possible_move_list.append(possible_moves[entry])
+        
+    possible_move_list = RemoveDuplicates(possible_move_list)
+
+    Check = CheckForCheck(turn)
+    if possible_move_list == [] and Check == True:
+        print (turn, 'loses.')
+        pygame.quit()
+        quit()
+    if possible_move_list == [] and Check == False:
+        print ('Stalemate. you had one job')
+        pygame.quit()
+        quit()
+
+
+# Pauses the game if a player gets their pawn to the opposite side of the board
+# and lets the player decide what that pawn will become.
+def PromotionLoop(j):
+    global piece_data,turn   
+    DisplayDeselectedBoard()
+
+    x = 3*tile_size+5
+    y = 8*tile_size+11
+    arrow_pos = 0
+    pick_list = ['quee','rook','nite','bish']
+    promotionExit = False
+
+    while promotionExit == False:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    if arrow_pos == 0:
+                        arrow_pos = 3
+                    else:
+                        arrow_pos -= 1
+                if event.key == pygame.K_DOWN:
+                    if arrow_pos == 3:
+                        arrow_pos = 0
+                    else:
+                        arrow_pos += 1
+                if event.key == pygame.K_RETURN:
+                    for e in range(len(piece_data)):
+                        if piece_data[e] == j:
+                            piece_data[e][1] = pick_list[arrow_pos]
+                            piece_data[e][2] = 2
+                            UpdateBoardSquare(j[3][0],j[3][1],False)
+                            DisplayBottomPanel()
+                            pygame.display.update()
+                            MainLoop()
+
+            DisplayBottomPanel()
+            gameDisplay.blit(promotion_chartIMG,(x,y))
+            gameDisplay.blit(promotion_arrowIMG,(x+3,y+4+(18*arrow_pos)))
+            pygame.display.update()
+
+
+# Handles mouse inputs on the bottom panel.
+# x,y represent the mouse input coordinates in pixels.
+def AssistLoop():
+    global buttonID
+    frame = 0
+    synergyON = False
+    previous_click = 0
+    previous_index = 4
+    index = 4
+    corner = [(5*tile_size)+4,(8*tile_size)+22]
+
+    assistExit = False
+    while assistExit == False:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    BotMove()
+                    DisplayDeselectedBoard()
+                    #MainLoop()
+
+        frame += 1
+        if frame == 200:
+            frame = 0
+
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
+
+        x_pos = mouse[0]
+        y_pos = mouse[1]
+
+        if click[0] == 1 and y_pos < 8*tile_size:
+            buttonID = [0,0,0,0]
+            DisplayBottomPanel()
+            MainLoop()
+
+        if click[0] == 1 and previous_click == 0:
+            index = 4
+            for column in range(0,2):
+                for row in range(0,2):
+                    top_left = [corner[0]+(37*column),corner[1]+(36*row)]
+                    if top_left[0] < x_pos < top_left[0]+35 and top_left[1] < y_pos < top_left[1]+34:
+                        index = (2*column)+row
+
+            if index != 4:
+                for button in range(len(buttonID)):
+                    if buttonID[button] == 1:
+                        buttonID[button] = 0
+                buttonID[index] = (buttonID[index]+1)%2
+            else:
+                buttonID = [0,0,0,0]
+
+            if index != previous_index:
+                synergyON = False
+                DisplayDeselectedBoard()
+
+            if index == 0:
+                color = 'white'
+                controlled_square_list = CalculateControlledSquares(color)
+                for entry in range(len(controlled_square_list)):
+                    gameDisplay.blit(attack_squareIMG,controlled_square_list[entry])
+                for i in range(0,piece_count):
+                    DisplayPiece(i)
+                pygame.display.update()
+            if index == 1:
+                color = 'black'
+                controlled_square_list = CalculateControlledSquares(color)
+                for entry in range(len(controlled_square_list)):
+                    gameDisplay.blit(attack_squareIMG,controlled_square_list[entry])
+                for i in range(0,piece_count):
+                    DisplayPiece(i)
+                pygame.display.update()
+            if index == 2:
+                color = 'white'
+                synergy_square_list = CalculateProtectedSquares(color)
+                for i in range(0,piece_count):
+                    if piece_data[i][0] == color:
+                        DisplaySynergyShield(i,synergy_square_list,frame)
+                synergyON = True
+                pygame.display.update()
+            if index == 3:
+                color = 'black'
+                synergy_square_list = CalculateProtectedSquares(color)
+                for i in range(0,piece_count):
+                    if piece_data[i][0] == color:
+                        DisplaySynergyShield(i,synergy_square_list,frame)
+                pygame.display.update()
+                synergyON = True
+
+        if synergyON == True:
+            for i in range(0,piece_count):
+                if piece_data[i][0] == color and piece_data[i][3] not in synergy_square_list:
+                    DisplaySynergyShield(i,synergy_square_list,frame)
+            
+        DisplayBottomPanel()
+        pygame.display.update()
+        previous_click = click[0]
+        previous_index = index
+
+
+# The main game loop
+def MainLoop():
+    previous_click = 0
+    selected_piece = 50
+    possible_move_list = []
+    possible_passant_square = []
+    possible_castle_square = []
+    Clear = False
+
+    gameExit = False
+    while gameExit == False:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    BotMove()
+                    DisplayDeselectedBoard()
+
+        DisplayBottomPanel()
+        
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
+
+        if click[0] == 1 and previous_click == 0:
+            x_pos = 0
+            x = mouse[0]
+            while x > tile_size:
+                x -= tile_size
+                x_pos += tile_size
+
+            y_pos = 0
+            y = mouse[1]
+            while y > tile_size:
+                y -= tile_size
+                y_pos += tile_size
+
+            if [x_pos,y_pos] in possible_move_list:
+                MovePiece(x_pos,y_pos,selected_piece)
+                Clear = True
+            if [x_pos,y_pos] in possible_passant_square:
+                EnPassantMove(x_pos,y_pos,selected_piece)
+                Clear = True
+            if [x_pos,y_pos] in possible_castle_square:
+                CastleMove(x_pos,y_pos,selected_piece)
+                Clear = True
+
+            if Clear == True:
+                possible_move_list = []
+                possible_passant_square = []
+                possible_castle_square = []
+            Clear = False
+
+            for i in range(0,piece_count):
+                if [x_pos,y_pos] == piece_data[i][3] and turn == piece_data[i][0]:
+                    if selected_piece == i:
+                        selected_piece = 50
+                        DisplayDeselectedBoard()
+                    else:
+                        selected_piece = i
+                        possible_move_list = HighlightPossibleMoves(i,x_pos,y_pos)
+                        if piece_data[i][1] == 'pawn':
+                            possible_passant_square = CanYouPassant(i)
+                        if piece_data[i][1] == 'king':
+                            possible_castle_square = CanYouCastle(turn)
+
+            for j in piece_data:
+                if j[0] == 'white' and j[1] == 'pawn':
+                    if j[3][1] == 0:
+                        PromotionLoop(j)
+            for j in piece_data:
+                if j[0] == 'black' and j[1] == 'pawn':
+                    if j[3][1] == 7*tile_size:
+                        PromotionLoop(j)
+
+        previous_click = click[0]
+
+        if click[0] == 1 and y_pos >= 8*tile_size:
+            DisplayDeselectedBoard()
+            selected_piece = 50
+            AssistLoop()
+
+        previous_click = click[0]
+        pygame.display.update()
+        clock.tick(60)
+
+
+# Calculates and performs a move. Cannot Castle nor En Passant.
+def BotMove():
+    global turn,piece_data
+    control_score = 0
+    synergy_score = 0
+    max_number = 0
+    move_reward = []
+    decisions = []
+
+    for i in range(0,piece_count):
+        possible_moves = []
+        if piece_data[i][0] == turn and piece_data[i][3] != [8*tile_size,8*tile_size]:
+            possible_moves = CalculateValidMoves(i)
+        decisions.append([i,possible_moves])
+
+    for entry in range(len(decisions)):
+        piece_decisions = decisions[entry][1]
+        for sub_entry in range(len(piece_decisions)):
+            #reset variables
+            control_score = 0
+            synergy_score = 0
+            reward = 0
+            original_square = piece_data[entry][3]
+            kill_number = 32
+            kill_reward = 0
+
+            #do move
+            for i in range(0,piece_count):
+                if piece_data[i][3] == piece_decisions[sub_entry]:
+                    kill_number = i
+                    piece_data[i][3] = [8*tile_size,8*tile_size]
+            piece_data[entry][3] = piece_decisions[sub_entry]
+
+            #calculate reward
+            synergy_squares = CalculateProtectedSquares(turn)
+            control_squares = CalculateControlledSquares(turn)
+            synergy_score = len(synergy_squares)
+            control_score = len(control_squares)
+            if kill_number != 32:
+                if piece_data[kill_number][1] == 'pawn':
+                    kill_reward = 8
+                elif piece_data[kill_number][1] == 'nite':
+                    kill_reward = 15
+                elif piece_data[kill_number][1] == 'bish':
+                    kill_reward = 15
+                elif piece_data[kill_number][1] == 'rook':
+                    kill_reward = 50
+                elif piece_data[kill_number][1] == 'quee':
+                    kill_reward = 100
+                elif piece_data[kill_number][1] == 'king':
+                    kill_reward = 999
+            reward = (synergy_score) + (control_score) + (kill_reward)
+            
+            #append reward
+            move_reward.append([reward,entry,piece_decisions[sub_entry]])
+            
+            #undo move
+            piece_data[entry][3] = original_square
+            if kill_number != 32:
+                piece_data[kill_number][3] = piece_decisions[sub_entry]            
+
+    #Note: If there's a tie, this will pick the earliest entry
+    for entry in range(len(move_reward)):
+        number = move_reward[entry][0]
+        if number > max_number:
+            max_number = move_reward[entry][0]
+            lucky_piece = move_reward[entry][1]
+            x_pos = move_reward[entry][2][0]
+            y_pos = move_reward[entry][2][1]
+
+    if turn == 'white':
+        CheckForCheckmate('black')
+    else:
+        CheckForCheckmate('white')
+        
+    MovePiece(x_pos,y_pos,lucky_piece)
+    #print (move_count)
+
+    #Note: The MovePiece() function changes the turn at the end,
+    #      so that explains the backwardness of this.
+    if turn == 'black' and y_pos == 0:
+        piece_data[lucky_piece][1] = 'quee'
+    elif turn == 'white' and y_pos == 7*tile_size:
+        piece_data[lucky_piece][1] = 'quee'
+
+Setup()
+MainLoop()
+pygame.quit()
+quit()
