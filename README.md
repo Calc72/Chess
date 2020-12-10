@@ -11,7 +11,7 @@ How To Play:
   Available moves show up as light green squares, click on a light green square to move your piece there.
   En Passant and Castle moves show up as yellow squares, click on the square to perform the move.
 
-  Press Space to make the robot execute a single move.  The robot only works for the black team.
+  Press Space to make the robot execute a single move.  The robot works for both teams.
 
   There is a panel on the bottom with four buttons, click a button to activate its function.
   Only one button may be pressed at a time, and selecting a second button will deselect the first one.
